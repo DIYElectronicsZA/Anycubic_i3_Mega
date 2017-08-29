@@ -188,7 +188,8 @@
   #define PID_dT ((OVERSAMPLENR * 8.0)/(F_CPU / 64.0 / 256.0)) //sampling period of the temperature routine
 
 //FIT FOR ANYCUBIC PRUSA I3
-  #define  DEFAULT_Kp 22.2// 18.11
+//  #define  DEFAULT_Kp 12.2// 18.11
+#define  DEFAULT_Kp 22.2// 18.11
   #define  DEFAULT_Ki 3.5//1.08// 0.54
   #define  DEFAULT_Kd 154 //141.85
 
