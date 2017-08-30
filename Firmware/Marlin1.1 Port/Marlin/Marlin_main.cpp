@@ -349,6 +349,50 @@
                            || isnan(ubl.z_values[0][0]))
 #endif
 
+// *AnyCubic Mods: Variables
+//Public:
+char seekdataflag=0;
+
+char AssistLeveTestflag=0;
+char PointTestFlag=0;
+char Z_offset_debug_flag=0;
+float Current_z_offset;
+static bool HomeFlag=0;
+char AutoLevelLowSpeedModelFlag=0;
+uint16_t filenumber;
+void get_command_from_TFT();
+bool ReadMyfileNrFlag=true;
+extern uint16_t MyFileNrCnt;
+
+//Private:
+static char TFTcmdbuffer[TFTBUFSIZE][TFT_MAX_CMD_SIZE];
+static int TFTbuflen=0;
+static int TFTbufindr = 0;
+static int TFTbufindw = 0;
+static bool TFTfromsd[TFTBUFSIZE];
+static char serial3_char;
+static int serial3_count = 0;
+static boolean TFTcomment_mode = false;
+static char *TFTstrchr_pointer;
+
+
+
+char TFTpausingFlag=0;//for return a flag that buffer carry out
+char TFTStatusFlag=0;
+extern char TFTresumingflag;
+char sdcardstartprintingflag=0;
+char FilamentTestFlag=true;
+
+//extern static bool FlagResumFromOutage;
+
+#if defined(OutageTest)
+int PowerInt= 6;//
+unsigned char PowerTestFlag=false;
+unsigned char ResumingFlag=0;
+#endif
+
+// *AnyCubic
+
 bool Running = true;
 
 uint8_t marlin_debug_flags = DEBUG_NONE;
@@ -8940,6 +8984,8 @@ inline void gcode_M226() {
 
 #endif // PIDTEMPBED
 
+
+
 #if defined(CHDK) || HAS_PHOTOGRAPH
 
   /**
@@ -13304,6 +13350,609 @@ void stop() {
   }
 }
 
+// *AnyCubic Mods Functions:
+void setup_OutageTestPin()
+{
+  #if defined(OutageTest)
+  pinMode(OUTAGETEST_PIN,INPUT);
+  pinMode(OUTAGECON_PIN,OUTPUT);
+  WRITE(OUTAGECON_PIN,LOW);
+  #endif
+}
+// void setup_killpin()
+// {
+//   #if defined(KILL_PIN) && KILL_PIN > -1
+//     pinMode(KILL_PIN,INPUT);
+//     WRITE(KILL_PIN,HIGH);
+//   #endif
+// }
+
+void SetupFilament()
+{
+    pinMode(FilamentTestPin,INPUT);
+    WRITE(FilamentTestPin,HIGH);
+    if(READ(FilamentTestPin)==true)
+    {
+      NEW_SERIAL_PROTOCOLPGM("J15");//j15 FILAMENT LACK
+      TFT_SERIAL_ENTER();
+     }
+}
+
+void FilamentScan()
+{
+static char last_status=READ(FilamentTestPin);
+static unsigned char now_status,status_flag=false;
+static unsigned int counter=0;
+ now_status=READ(FilamentTestPin)&0xff;
+ if(now_status>last_status)
+ {
+    counter++;
+    if(counter>=15800)
+    {
+       counter=0;
+      if((card.sdprinting==true))
+      {
+            NEW_SERIAL_PROTOCOLPGM("J23");//j23 FILAMENT LACK with the prompt box don't disappear
+            TFT_SERIAL_ENTER();
+        TFTpausingFlag=true;
+        card.pauseSDPrint();
+      }
+      else if((card.sdprinting==false))
+      {
+            NEW_SERIAL_PROTOCOLPGM("J15");//j15 FILAMENT LACK
+            TFT_SERIAL_ENTER();
+      }
+      last_status=now_status;
+    }
+  }
+  else if(now_status!=last_status) {counter=0;last_status=now_status;}
+
+}
+
+void setuplevelTest()
+{
+    pinMode(Z_TEST,INPUT);
+    WRITE(Z_TEST, HIGH);
+        pinMode(BUZZER,OUTPUT);
+    WRITE(BUZZER, LOW);
+
+}
+
+void NewClearToSend(){
+  previous_cmd_ms = millis();
+    #ifdef SDSUPPORT
+    if(TFTfromsd[TFTbufindr])
+      return;
+    #endif //SDSUPPORT
+}
+
+void NEWFlushSerialRequestResend()
+{
+  //char cmdbuffer[cmd_queue_index_r][100]="Resend:";
+  NewSerial.flush();
+  NewClearToSend();
+}
+float TFTcode_value()
+{
+  return (strtod(&TFTcmdbuffer[TFTbufindr][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindr] + 1], NULL));
+}
+bool TFTcode_seen(char code)
+{
+  TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindr], code);
+  return (TFTstrchr_pointer != NULL);  //Return True if a character was found
+}
+
+
+// uint16_t MyGetFileNr()
+// {
+// 	if(card.cardOK)
+// 	{
+// 		MyFileNrCnt=0;
+// 	    ReadMyfileNrFlag=true;
+// 		delay(10);
+// 		card.Myls();
+// 	}
+// 	return MyFileNrCnt;
+// }
+
+
+
+void get_command_from_TFT()
+{
+  char *starpos = NULL;
+	while( NewSerial.available() > 0  && TFTbuflen < TFTBUFSIZE) {
+	   serial3_char = NewSerial.read();
+	   if(serial3_char == '\n' ||
+		  serial3_char == '\r' ||
+		  (serial3_char == ':' && TFTcomment_mode == false) ||
+		  serial3_count >= (TFT_MAX_CMD_SIZE - 1) )
+	   {
+		 if(!serial3_count) { //if empty line
+		   TFTcomment_mode = false; //for new command
+		   return;
+		 }
+		 TFTcmdbuffer[TFTbufindw][serial3_count] = 0; //terminate string
+		 if(!TFTcomment_mode){
+		   TFTcomment_mode = false; //for new command
+		   TFTfromsd[TFTbufindw] = false;
+		   if(strchr(TFTcmdbuffer[TFTbufindw], 'N') != NULL)
+		   {
+			 TFTstrchr_pointer = strchr(TFTcmdbuffer[cmd_queue_index_w], 'N');
+			 gcode_N = (strtol(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL, 10));
+			 if(gcode_N != gcode_LastN+1 && (strstr_P(TFTcmdbuffer[TFTbufindw], PSTR("M110")) == NULL) ) {
+			   NEW_SERIAL_ERROR_START;
+			   NEWFlushSerialRequestResend();
+			   serial3_count = 0;
+			   return;
+			 }
+
+			 if(strchr(TFTcmdbuffer[TFTbufindw], '*') != NULL)
+			 {
+			   byte checksum = 0;
+			   byte count = 0;
+			   while(TFTcmdbuffer[TFTbufindw][count] != '*') checksum = checksum^TFTcmdbuffer[TFTbufindw][count++];
+			   TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindw], '*');
+
+			   if( (int)(strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)) != checksum) {
+				 NEW_SERIAL_ERROR_START;
+				 NEWFlushSerialRequestResend();
+
+				 NEW_SERIAL_ERROR_START;
+				 NEWFlushSerialRequestResend();
+				 serial3_count = 0;
+				 return;
+			   }
+			   //if no errors, continue parsing
+			 }
+			 else
+			 {
+			   NEW_SERIAL_ERROR_START;
+			   NEWFlushSerialRequestResend();
+			   serial3_count = 0;
+			   return;
+			 }
+			 gcode_LastN = gcode_N;
+			 //if no errors, continue parsing
+		   }
+		   else  // if we don't receive 'N' but still see '*'
+		   {
+			 if((strchr(TFTcmdbuffer[TFTbufindw], '*') != NULL))
+			 {
+			   NEW_SERIAL_ERROR_START;
+			   serial3_count = 0;
+			   return;
+			 }
+		   }
+                   if((strchr(TFTcmdbuffer[TFTbufindw], 'A') != NULL)){
+			 TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindw], 'A');
+			 switch((int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)))){
+
+			 case 0://A0 GET HOTEND TEMP
+                          //NEW_SERIAL_PROTOCOLPGM("A0V ");
+                          //NEW_SERIAL_PROTOCOL(itostr3(int(degHotend(0) + 0.5)));
+                          //TFT_SERIAL_ENTER();
+                              break;
+                         case 1: //A1  GET HOTEND TARGET TEMP
+                          //NEW_SERIAL_PROTOCOLPGM("A1V ");
+                          //NEW_SERIAL_PROTOCOL(itostr3(int(degTargetHotend(0) + 0.5)));
+                          //TFT_SERIAL_ENTER();
+                              break;
+                         case 2://A2 GET HOTBED TEMP
+                          //NEW_SERIAL_PROTOCOLPGM("A2V ");
+                          //NEW_SERIAL_PROTOCOL(itostr3(int(degBed() + 0.5)));
+                          //TFT_SERIAL_ENTER();
+                              break;
+                         case 3://A3 GET HOTBED TARGET TEMP
+                          //NEW_SERIAL_PROTOCOLPGM("A3V ");
+                          //NEW_SERIAL_PROTOCOL(itostr3(int(degTargetBed() + 0.5)));
+                          //TFT_SERIAL_ENTER();
+                              break;
+
+                         case 4://A4 GET FAN SPEED
+                          {
+                            unsigned int temp;
+                         //   temp=((fanSpeed*100)/256+1);
+                            //temp=((fanSpeed*100)/179+1);//MAX 70%
+                            temp=constrain(temp,0,100);
+                            NEW_SERIAL_PROTOCOLPGM("A4V ");
+                            NEW_SERIAL_PROTOCOL(temp);
+                            TFT_SERIAL_ENTER();
+                          }
+                            break;
+                         case 5:// A5 GET CURRENT COORDINATE
+                          NEW_SERIAL_PROTOCOLPGM("A5V");
+                          TFT_SERIAL_SPACE();
+                          NEW_SERIAL_PROTOCOLPGM("X: ");
+                          NEW_SERIAL_PROTOCOL(current_position[X_AXIS]);
+                          TFT_SERIAL_SPACE();
+                          NEW_SERIAL_PROTOCOLPGM("Y: ");
+                          NEW_SERIAL_PROTOCOL(current_position[Y_AXIS]);
+                          TFT_SERIAL_SPACE();
+                          NEW_SERIAL_PROTOCOLPGM("Z: ");
+                          NEW_SERIAL_PROTOCOL(current_position[Z_AXIS]);
+                          TFT_SERIAL_SPACE();
+                          TFT_SERIAL_ENTER();
+                          break;
+                          case 6: //A6 GET SD CARD PRINTING STATUS
+                          if(card.sdprinting){
+                          NEW_SERIAL_PROTOCOLPGM("A6V ");
+                          TFTStatusFlag=1;
+                        //  card.getStatus();
+                           //card.TFTgetStatus();
+                          }
+                          else NEW_SERIAL_PROTOCOLPGM("A6V ---");
+                          TFT_SERIAL_ENTER();
+                          break;
+                          case 7://A7 GET PRINTING TIME
+                          {
+                          NEW_SERIAL_PROTOCOLPGM("A7V ");
+                           //  need to convert to print_job_timer
+                           //if(starttime != 0) //print time
+
+                          // {
+                          //     uint16_t time = millis()/60000 - starttime/60000;
+                      	  //     //NEW_SERIAL_PROTOCOL(itostr2(time/60));
+                          //     TFT_SERIAL_SPACE();
+                          //     NEW_SERIAL_PROTOCOLPGM("H");
+                          //     TFT_SERIAL_SPACE();
+                      	  //     NEW_SERIAL_PROTOCOL(itostr2(time%60));
+                          //     TFT_SERIAL_SPACE();
+                          //     NEW_SERIAL_PROTOCOLPGM("M");
+                          // }else{
+                          //     TFT_SERIAL_SPACE();
+                      	  //     NEW_SERIAL_PROTOCOLPGM("999:999");
+                      		//  }
+                          //     TFT_SERIAL_ENTER();
+
+                          break;
+                          }
+                          case 8: //A8 GET  SD LIST
+			                    // MyFileNrCnt=0;
+                          // if(!IS_SD_INSERTED){NEW_SERIAL_PROTOCOLPGM("J02");TFT_SERIAL_ENTER();}
+                          // else{
+                          //  MyGetFileNr();
+			                    //  ReadMyfileNrFlag=false;
+                          // if(TFTcode_seen('S')) filenumber=TFTcode_value();
+                          //   NEW_SERIAL_PROTOCOLPGM("FN ");
+                          //   TFT_SERIAL_ENTER();
+                          //   //card.Myls();
+                          //   NEW_SERIAL_PROTOCOLPGM("END");
+                          //   TFT_SERIAL_ENTER();
+                          // }
+                          break;
+                          case 9: // a9 pasue sd
+                          if(card.sdprinting)
+                          {
+                                    TFTpausingFlag=true;
+                                    card.pauseSDPrint();
+                                    NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
+                                    TFT_SERIAL_ENTER();
+
+                          }
+                          else
+                          {
+                            NEW_SERIAL_PROTOCOLPGM("J16");//j16,if status error, send stop print flag in case TFT no response
+                            TFT_SERIAL_ENTER();
+                          }
+                          break;
+                          case 10:// A10 resume sd print
+                          // if(TFTresumingflag)
+                          // {
+                          //     card.startFileprint();
+                          //     NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
+                          //     TFT_SERIAL_ENTER();
+                          // }
+                          break;
+                          case 11://A11 STOP SD PRINT
+                          // if((card.sdprinting)||TFTresumingflag)
+                          // {
+                          //     FlagResumFromOutage=0;//must clean the flag.
+                          //     //card.TFTStopPringing();
+                          //     enquecommand_P(PSTR("M84"));
+                          // }
+                          break;
+                          case 12: //a12 kill
+                          // NEW_SERIAL_PROTOCOLPGM("J11");//kill()
+                          // TFT_SERIAL_ENTER();
+                          // kill();
+                          // break;
+                          case 13: //A13 SELECTION FILE
+			                    // if((!movesplanned())&&(!TFTresumingflag))
+                          // {
+                          //   starpos = (strchr(TFTstrchr_pointer + 4,'*'));
+                          //   if(starpos!=NULL)
+                          //     *(starpos-1)='\0';
+                          //   card.openFile(TFTstrchr_pointer + 4,true);
+                          //   sdcardstartprintingflag=1;
+                          //   TFT_SERIAL_ENTER();
+                          // }
+                          break;
+                          case 14: //A14 START PRINTING
+                          //  need to convert to print_job_timer
+			                    //  if((!movesplanned())&&(!TFTresumingflag))
+                          // {
+                          //   card.startFileprint();
+                          //   starttime=millis();
+                          //   NEW_SERIAL_PROTOCOLPGM("J06");//hotend heating
+                          //   TFT_SERIAL_ENTER();
+                          // }
+                          break;
+                          case 15://A15 RESUMING FROM OUTAGE
+                          //  need to convert to print_job_timer
+                    			// if((!movesplanned())&&(!TFTresumingflag))
+                          // {
+                          //       if(card.cardOK)
+                          //       FlagResumFromOutage=true;
+                          //       ResumingFlag=1;
+                          //       card.startFileprint();
+                          //       starttime=millis();
+                          //       NEW_SERIAL_SUCC_START;
+                          // }
+                          // TFT_SERIAL_ENTER();
+                          break;
+                          case 16://a16 set hotend temp
+                      //     {
+                      //      unsigned int tempvalue;
+                      //    //   char value[15];
+                      //      if(TFTcode_seen('S'))
+                      //       {
+                      //         tempvalue=constrain(TFTcode_value(),0,275);
+                      //         setTargetHotend0(tempvalue);
+                      //         setWatch();
+                      //       }
+                      //      else if((TFTcode_seen('C'))&&(!movesplanned()))
+                      //       {
+                      //         if((READ(Z_TEST)==0)) enquecommand_P(PSTR("G1 Z10")); //RASE Z AXIS
+                      //         tempvalue=constrain(TFTcode_value(),0,275);
+                      //         setTargetHotend0(tempvalue);
+                      //         setWatch();
+                      //       }
+                      //     }
+                      // //    TFT_SERIAL_ENTER();
+                          break;
+                          case 17:// a17 set hotbed temp
+                          {
+                        //    unsigned int tempbed;
+                        //     if(TFTcode_seen('S')){tempbed=constrain(TFTcode_value(),0,150);
+                        //     setTargetBed(tempbed);
+                        //  setWatch(); }
+                          }
+                        //  TFT_SERIAL_ENTER();
+                          break;
+                          case 18://a18 set fan speed
+                        //   unsigned int temp;
+                        //   if (TFTcode_seen('S'))
+                        //   {
+                        //  //   temp=(TFTcode_value()*255/100);
+                        //   temp=(TFTcode_value()*179/100);//179--70;204---80
+                        //  //   temp=constrain(temp,0,255);
+                        //   temp=constrain(temp,0,179);// the max fan speed set to 70%
+                        //     fanSpeed =temp;
+                        //   }
+                        //   else fanSpeed=179; //fanSpeed=255;
+                        //   TFT_SERIAL_ENTER();
+                          break;
+                          case 19: // A19 CLOSED STEPER DIRV
+                          // if((!movesplanned())&&(!card.sdprinting))
+                          // {
+                          //   quickStop();
+                          //   disable_x();
+                          //   disable_y();
+                          //   disable_z();
+                          //   disable_e0();
+                          // }
+                          // TFT_SERIAL_ENTER();
+                          break;
+                          case 20:// a20 read printing speed
+                          // {
+                          //
+                          //     if(TFTcode_seen('S')){
+                          //     feedmultiply=constrain(TFTcode_value(),40,999);}
+                          //     else{
+                          //         NEW_SERIAL_PROTOCOLPGM("A20V ");
+                          //         NEW_SERIAL_PROTOCOL(feedmultiply);
+                          //         TFT_SERIAL_ENTER();
+                          //     }
+                          // }
+                          break;
+                          case 21: //a21 all home
+                  			     if((!planner.movesplanned())) //&&(!TFTresumingflag))
+                              {
+                                if(TFTcode_seen('X')||TFTcode_seen('Y')||TFTcode_seen('Z'))
+                                {
+                                  if(TFTcode_seen('X')) enqueue_and_echo_commands_P(PSTR("G28 X"));
+                                  if(TFTcode_seen('Y')) enqueue_and_echo_commands_P(PSTR("G28 Y"));
+                                  if(TFTcode_seen('Z')) enqueue_and_echo_commands_P(PSTR("G28 Z"));
+                                }
+                                else if(TFTcode_seen('C')) enqueue_and_echo_commands_P(PSTR("G28"));
+                              }
+                          break;
+                          case 22: // A22 move X /Y/Z
+			            //  if((!movesplanned())&&(!TFTresumingflag))
+                  //         {
+                  //           float coorvalue;
+                  //           unsigned int movespeed=0;
+                  //           char value[30];
+                  //           if(TFTcode_seen('F')) movespeed =TFTcode_value();//movespeed=constrain(TFTcode_value(), 1,5000);
+                  //           enquecommand_P(PSTR("G91"));
+                  //           if(TFTcode_seen('X'))
+                  //           {
+                  //              coorvalue=TFTcode_value();
+                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 X0.1F%i"),movespeed);enquecommand(value);}
+                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 X-0.1F%i"),movespeed);enquecommand(value);}
+                  //             else {sprintf_P(value,PSTR("G1 X%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
+                  //           }
+                  //           else if(TFTcode_seen('Y'))
+                  //           {
+                  //             coorvalue=TFTcode_value();
+                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 Y0.1F%i"),movespeed);enquecommand(value);}
+                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 Y-0.1F%i"),movespeed);enquecommand(value);}
+                  //             else {sprintf_P(value,PSTR("G1 Y%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
+                  //           }
+                  //          else if(TFTcode_seen('Z'))
+                  //          {
+                  //             coorvalue=TFTcode_value();
+                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 Z0.1F%i"),movespeed);enquecommand(value);}
+                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 Z-0.1F%i"),movespeed);enquecommand(value);}
+                  //             else {sprintf_P(value,PSTR("G1 Z%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
+                  //          }
+                  //         else if(TFTcode_seen('E'))
+                  //          {
+                  //             coorvalue=TFTcode_value();
+                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 E0.1F%i"),movespeed);enquecommand(value);}
+                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 E-0.1F%i"),movespeed);enquecommand(value);}
+                  //             else {sprintf_P(value,PSTR("G1 E%iF500"),int(coorvalue)); enquecommand(value); }
+                  //           //  else {sprintf_P(value,PSTR("G1 E%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
+                  //          }
+                  //            enquecommand_P(PSTR("G90"));
+                  //         }
+                  //         TFT_SERIAL_ENTER();
+                          break;
+                          case 23: //a23 prheat pla
+			  // if((!movesplanned())&&(!TFTresumingflag))
+        //                   {
+        //                     if((READ(Z_TEST)==0)) enquecommand_P(PSTR("G1 Z10")); //RASE Z AXIS
+        //                     setTargetBed(50);
+        //                     setTargetHotend(190, 0);
+        //                     NEW_SERIAL_SUCC_START;
+        //                     TFT_SERIAL_ENTER();
+        //                   }
+                          break;
+                          case 24://a24 prheat abs
+			  // if((!movesplanned())&&(!TFTresumingflag))
+        //                   {
+        //                     if((READ(Z_TEST)==0)) enquecommand_P(PSTR("G1 Z10")); //RASE Z AXIS
+        //                     setTargetBed(80);
+        //                      setTargetHotend(240, 0);
+        //
+        //                     NEW_SERIAL_SUCC_START;
+        //                     TFT_SERIAL_ENTER();
+        //                   }
+                          break;
+                         case 25: //a25 cool down
+			                //  if((!movesplanned())&&(!TFTresumingflag))
+                      //    {
+                      //       setTargetHotend0(0);
+                      //       setTargetBed(0);
+                      //       NEW_SERIAL_PROTOCOLPGM("J12");//
+                      //       TFT_SERIAL_ENTER();
+                      //    }
+                         break;
+                         case 26://a26 refresh
+                         card.initsd();
+                         if(!IS_SD_INSERTED){ NEW_SERIAL_PROTOCOLPGM("J02");TFT_SERIAL_ENTER();}
+                         break;
+                         #ifdef SERVO_ENDSTOPS
+                         case 27://a27 servos angles  adjust
+                         break;
+                         #endif
+                         case 28://A28 filament test
+                         {
+                           if(TFTcode_seen('O'));
+                           else if(TFTcode_seen('C'));
+                         }
+                         TFT_SERIAL_ENTER();
+                         break;
+                         case 29:   //A29 Z PROBE OFFESET SET
+                         break;
+
+                         case 30://a30 assist leveling, this function was canceled
+                         break;
+                         case 31: //a31 zoffset
+                         break;
+
+                         case 32:  //a32 clean leveling beep flag
+                         break;
+                         case 33:// a33 get version info
+                        //  {
+                        //       NEW_SERIAL_PROTOCOLPGM("J33 ");
+                        //       NEW_SERIAL_PROTOCOLPGM(MSG_MY_VERSION);
+                        //       TFT_SERIAL_ENTER();
+                        //  }
+                         break;
+			 default: break;
+			}
+		   }
+		   TFTbufindw = (TFTbufindw + 1)%TFTBUFSIZE;
+		   TFTbuflen += 1;
+		 }
+		 serial3_count = 0; //clear buffer
+	   }
+	   else
+	   {
+		 if(serial3_char == ';') TFTcomment_mode = true;
+		 if(!TFTcomment_mode) TFTcmdbuffer[TFTbufindw][serial3_count++] = serial3_char;
+	   }
+	 }
+}
+
+
+
+void SetUpFAN2_PIN()
+{
+    SET_OUTPUT(FAN2_PIN);
+    WRITE(FAN2_PIN, LOW);
+}
+void Fan2Scan()
+{
+  // if(degHotend(0)>65)
+  // WRITE(FAN2_PIN, HIGH);
+  // else WRITE(FAN2_PIN, LOW);
+}
+
+void TFT_Commond_Scan()
+{
+#ifdef TFTmodel
+  if(TFTbuflen<(TFTBUFSIZE-1))
+  get_command_from_TFT();
+  if(TFTbuflen)
+  {
+  TFTbuflen = (TFTbuflen-1);
+  TFTbufindr = (TFTbufindr + 1)%TFTBUFSIZE;
+  }
+#endif
+}
+
+void setupSDCARD()
+{
+  card.initsd();
+}
+
+void PowerKill()
+{
+//  SERIAL_ECHOLNPGM("int17 be called");
+     #ifdef OutageTest
+   if(PowerTestFlag==true)
+   {
+         OutageSave();
+         PowerTestFlag=false;
+   }
+  #endif
+}
+
+
+
+
+void MY_AUTOlevelAlarm()
+{
+  if((READ(Z_TEST)==0))  tone(BUZZER, 4000,1);
+  else noTone(BUZZER);
+}
+
+bool pauseCMDsendflag=false;
+void pauseCMDsend()
+{
+static char temp=0;
+ //if(buflen < BUFSIZE)
+ {
+   //temp++;
+   //if(temp==1)enquecommand_P(PSTR("G91"));
+   //if(temp==2){enquecommand_P(PSTR("G1 Z+20")); pauseCMDsendflag=false;temp=0;}
+ }
+}
+
+// *AnyCubic
+
 /**
  * Marlin entry-point: Set up before the program loop
  *  - Set up the kill pin, filament runout, power hold
@@ -13341,6 +13990,25 @@ void setup() {
   setup_killpin();
 
   setup_powerhold();
+
+  // *AnyCubic Mods:
+
+  //setup_OutageTestPin();
+  #ifdef TFTmodel
+  NewSerial.begin(115200);
+  //TFT_SERIAL_START();
+  NEW_SERIAL_PROTOCOLPGM("J17"); //j17 main board reset
+  TFT_SERIAL_ENTER();
+  delay(10);
+  NEW_SERIAL_PROTOCOLPGM("J12"); //  READY
+  TFT_SERIAL_ENTER();
+  #endif
+
+  //SetUpFAN2_PIN();
+  //setuplevelTest();
+  //setupSDCARD();
+  //SetupFilament();
+  // *AnyCubic
 
   #if HAS_STEPPER_RESET
     disableStepperDrivers();
@@ -13564,6 +14232,10 @@ void setup() {
  *  - Call LCD update
  */
 void loop() {
+  // *AnyCubic Mods
+  //if(pauseCMDsendflag)pauseCMDsend();//when pause,i need rase z axis,but if i use enquecommand_P,it maybe lose cmd,very dangerous,so i need sent cmd one by one
+  // *AnyCubic
+
   if (commands_in_queue < BUFSIZE) get_available_commands();
 
   #if ENABLED(SDSUPPORT)
@@ -13607,6 +14279,17 @@ void loop() {
     }
   }
   endstops.report_state();
+  // *AnyCubic Mods
+  #ifdef TFTmodel
+  TFT_Commond_Scan();
+  // if(TFTpausingFlag) //when pause sd printing,send "ok"to tft as read buffer carry out
+  // {
+  //   st_synchronize();
+  //   TFTpausingFlag=false;
+  //   NEW_SERIAL_PROTOCOLPGM("J18");// pausing done
+  //   TFT_SERIAL_ENTER();
+  // }
+  #endif
+  // *AnyCubic
   idle();
 }
-
