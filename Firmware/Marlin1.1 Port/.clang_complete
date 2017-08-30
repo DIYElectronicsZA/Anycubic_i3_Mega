@@ -1,12 +1,11 @@
--IE:\Users\RobThePyro\Docs\GitHub\Marlin\.pioenvs\megaatmega2560\src
+-IE:\Users\RobThePyro\Docs\GitHub\Anycubic_i3_Mega\Firmware\Marlin1.1 Port\.pioenvs\megaatmega2560\src
 -IC:\Users\Ramb0t\.platformio\packages\framework-arduinoavr\cores\arduino
 -IC:\Users\Ramb0t\.platformio\packages\framework-arduinoavr\variants\mega
--IE:\Users\RobThePyro\Docs\GitHub\Marlin\Marlin
--IE:\Users\RobThePyro\Docs\GitHub\Marlin\.piolibdeps\U8glib_ID7\src
+-IE:\Users\RobThePyro\Docs\GitHub\Anycubic_i3_Mega\Firmware\Marlin1.1 Port\Marlin
+-IE:\Users\RobThePyro\Docs\GitHub\Anycubic_i3_Mega\Firmware\Marlin1.1 Port\.piolibdeps\U8glib_ID7\src
 -IC:\Users\Ramb0t\.platformio\packages\framework-arduinoavr\libraries\__cores__\arduino\Wire\src
 -IC:\Users\Ramb0t\.platformio\packages\framework-arduinoavr\libraries\LiquidCrystal\src
--IE:\Users\RobThePyro\Docs\GitHub\Marlin\.piolibdeps\U8glib_ID7\src
--IE:\Users\RobThePyro\Docs\GitHub\Marlin\.piolibdeps\_tmp_installing-lljfil-package
+-IE:\Users\RobThePyro\Docs\GitHub\Anycubic_i3_Mega\Firmware\Marlin1.1 Port\.piolibdeps\U8glib_ID7\src
 -IC:\Users\Ramb0t\.platformio\lib\Adafruit_GFX_ID13
 -IC:\Users\Ramb0t\.platformio\lib\Adafruit_SSD1306_ID135
 -IC:\Users\Ramb0t\.platformio\lib\TimerOne_ID131
