@@ -13525,54 +13525,53 @@ void get_command_from_TFT()
 		   }
                    if((strchr(TFTcmdbuffer[TFTbufindw], 'A') != NULL)){
 			 TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindw], 'A');
-			 switch((int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)))){
-
-			 case 0://A0 GET HOTEND TEMP
-                          //NEW_SERIAL_PROTOCOLPGM("A0V ");
-                          //NEW_SERIAL_PROTOCOL(itostr3(int(degHotend(0) + 0.5)));
-                          //TFT_SERIAL_ENTER();
-                              break;
-                         case 1: //A1  GET HOTEND TARGET TEMP
-                          //NEW_SERIAL_PROTOCOLPGM("A1V ");
-                          //NEW_SERIAL_PROTOCOL(itostr3(int(degTargetHotend(0) + 0.5)));
-                          //TFT_SERIAL_ENTER();
-                              break;
-                         case 2://A2 GET HOTBED TEMP
-                          //NEW_SERIAL_PROTOCOLPGM("A2V ");
-                          //NEW_SERIAL_PROTOCOL(itostr3(int(degBed() + 0.5)));
-                          //TFT_SERIAL_ENTER();
-                              break;
-                         case 3://A3 GET HOTBED TARGET TEMP
-                          //NEW_SERIAL_PROTOCOLPGM("A3V ");
-                          //NEW_SERIAL_PROTOCOL(itostr3(int(degTargetBed() + 0.5)));
-                          //TFT_SERIAL_ENTER();
-                              break;
-
-                         case 4://A4 GET FAN SPEED
-                          {
-                            unsigned int temp;
-                         //   temp=((fanSpeed*100)/256+1);
-                            //temp=((fanSpeed*100)/179+1);//MAX 70%
-                            temp=constrain(temp,0,100);
-                            NEW_SERIAL_PROTOCOLPGM("A4V ");
-                            NEW_SERIAL_PROTOCOL(temp);
-                            TFT_SERIAL_ENTER();
-                          }
-                            break;
-                         case 5:// A5 GET CURRENT COORDINATE
-                          NEW_SERIAL_PROTOCOLPGM("A5V");
-                          TFT_SERIAL_SPACE();
-                          NEW_SERIAL_PROTOCOLPGM("X: ");
-                          NEW_SERIAL_PROTOCOL(current_position[X_AXIS]);
-                          TFT_SERIAL_SPACE();
-                          NEW_SERIAL_PROTOCOLPGM("Y: ");
-                          NEW_SERIAL_PROTOCOL(current_position[Y_AXIS]);
-                          TFT_SERIAL_SPACE();
-                          NEW_SERIAL_PROTOCOLPGM("Z: ");
-                          NEW_SERIAL_PROTOCOL(current_position[Z_AXIS]);
-                          TFT_SERIAL_SPACE();
-                          TFT_SERIAL_ENTER();
-                          break;
+			 switch((int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL))))
+       {
+        case 0://A0 GET HOTEND TEMP
+          NEW_SERIAL_PROTOCOLPGM("A0V ");
+          NEW_SERIAL_PROTOCOL(itostr3(int(thermalManager.degHotend(0) + 0.5)));
+          TFT_SERIAL_ENTER();
+          break;
+        case 1: //A1  GET HOTEND TARGET TEMP
+          NEW_SERIAL_PROTOCOLPGM("A1V ");
+          NEW_SERIAL_PROTOCOL(itostr3(int(thermalManager.degTargetHotend(0) + 0.5)));
+          TFT_SERIAL_ENTER();
+          break;
+       case 2://A2 GET HOTBED TEMP
+          NEW_SERIAL_PROTOCOLPGM("A2V ");
+          NEW_SERIAL_PROTOCOL(itostr3(int(thermalManager.degBed() + 0.5)));
+          TFT_SERIAL_ENTER();
+          break;
+       case 3://A3 GET HOTBED TARGET TEMP
+          NEW_SERIAL_PROTOCOLPGM("A3V ");
+          NEW_SERIAL_PROTOCOL(itostr3(int(thermalManager.degTargetBed() + 0.5)));
+          TFT_SERIAL_ENTER();
+          break;
+       case 4://A4 GET FAN SPEED
+        {
+          unsigned int temp;
+          //   temp=((fanSpeed*100)/256+1);
+          temp=((fanSpeeds[0]*100)/179+1);//MAX 70%
+          temp=constrain(temp,0,100);
+          NEW_SERIAL_PROTOCOLPGM("A4V ");
+          NEW_SERIAL_PROTOCOL(temp);
+          TFT_SERIAL_ENTER();
+        }
+          break;
+       case 5:// A5 GET CURRENT COORDINATE
+          NEW_SERIAL_PROTOCOLPGM("A5V");
+          TFT_SERIAL_SPACE();
+          NEW_SERIAL_PROTOCOLPGM("X: ");
+          NEW_SERIAL_PROTOCOL(current_position[X_AXIS]);
+          TFT_SERIAL_SPACE();
+          NEW_SERIAL_PROTOCOLPGM("Y: ");
+          NEW_SERIAL_PROTOCOL(current_position[Y_AXIS]);
+          TFT_SERIAL_SPACE();
+          NEW_SERIAL_PROTOCOLPGM("Z: ");
+          NEW_SERIAL_PROTOCOL(current_position[Z_AXIS]);
+          TFT_SERIAL_SPACE();
+          TFT_SERIAL_ENTER();
+          break;
                           case 6: //A6 GET SD CARD PRINTING STATUS
                           if(card.sdprinting){
                           NEW_SERIAL_PROTOCOLPGM("A6V ");
@@ -13648,14 +13647,14 @@ void get_command_from_TFT()
                           // {
                           //     FlagResumFromOutage=0;//must clean the flag.
                           //     //card.TFTStopPringing();
-                          //     enquecommand_P(PSTR("M84"));
+                          //     enqueue_and_echo_commands_P(PSTR("M84"));
                           // }
                           break;
                           case 12: //a12 kill
-                          // NEW_SERIAL_PROTOCOLPGM("J11");//kill()
-                          // TFT_SERIAL_ENTER();
-                          // kill();
-                          // break;
+                            NEW_SERIAL_PROTOCOLPGM("J11");//kill()
+                            TFT_SERIAL_ENTER();
+                            kill(PSTR(MSG_KILLED));
+                            break;
                           case 13: //A13 SELECTION FILE
 			                    // if((!movesplanned())&&(!TFTresumingflag))
                           // {
@@ -13691,24 +13690,24 @@ void get_command_from_TFT()
                           // TFT_SERIAL_ENTER();
                           break;
                           case 16://a16 set hotend temp
-                      //     {
-                      //      unsigned int tempvalue;
-                      //    //   char value[15];
-                      //      if(TFTcode_seen('S'))
-                      //       {
-                      //         tempvalue=constrain(TFTcode_value(),0,275);
-                      //         setTargetHotend0(tempvalue);
-                      //         setWatch();
-                      //       }
-                      //      else if((TFTcode_seen('C'))&&(!movesplanned()))
-                      //       {
-                      //         if((READ(Z_TEST)==0)) enquecommand_P(PSTR("G1 Z10")); //RASE Z AXIS
-                      //         tempvalue=constrain(TFTcode_value(),0,275);
-                      //         setTargetHotend0(tempvalue);
-                      //         setWatch();
-                      //       }
-                      //     }
-                      // //    TFT_SERIAL_ENTER();
+                          {
+                           unsigned int tempvalue;
+                         //   char value[15];
+                           if(TFTcode_seen('S'))
+                            {
+                              tempvalue=constrain(TFTcode_value(),0,275);
+                              //setTargetHotend0(tempvalue);
+                              //setWatch();
+                            }
+                           else if((TFTcode_seen('C'))&&(!planner.movesplanned()))
+                            {
+                              if((READ(Z_TEST)==0)) enqueue_and_echo_commands_P(PSTR("G1 Z10")); //RASE Z AXIS
+                              tempvalue=constrain(TFTcode_value(),0,275);
+                              //setTargetHotend0(tempvalue);
+                              //setWatch();
+                            }
+                          }
+                      //    TFT_SERIAL_ENTER();
                           break;
                           case 17:// a17 set hotbed temp
                           {
@@ -13768,50 +13767,50 @@ void get_command_from_TFT()
                               }
                           break;
                           case 22: // A22 move X /Y/Z
-			            //  if((!movesplanned())&&(!TFTresumingflag))
-                  //         {
-                  //           float coorvalue;
-                  //           unsigned int movespeed=0;
-                  //           char value[30];
-                  //           if(TFTcode_seen('F')) movespeed =TFTcode_value();//movespeed=constrain(TFTcode_value(), 1,5000);
-                  //           enquecommand_P(PSTR("G91"));
-                  //           if(TFTcode_seen('X'))
-                  //           {
-                  //              coorvalue=TFTcode_value();
-                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 X0.1F%i"),movespeed);enquecommand(value);}
-                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 X-0.1F%i"),movespeed);enquecommand(value);}
-                  //             else {sprintf_P(value,PSTR("G1 X%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
-                  //           }
-                  //           else if(TFTcode_seen('Y'))
-                  //           {
-                  //             coorvalue=TFTcode_value();
-                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 Y0.1F%i"),movespeed);enquecommand(value);}
-                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 Y-0.1F%i"),movespeed);enquecommand(value);}
-                  //             else {sprintf_P(value,PSTR("G1 Y%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
-                  //           }
-                  //          else if(TFTcode_seen('Z'))
-                  //          {
-                  //             coorvalue=TFTcode_value();
-                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 Z0.1F%i"),movespeed);enquecommand(value);}
-                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 Z-0.1F%i"),movespeed);enquecommand(value);}
-                  //             else {sprintf_P(value,PSTR("G1 Z%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
-                  //          }
-                  //         else if(TFTcode_seen('E'))
-                  //          {
-                  //             coorvalue=TFTcode_value();
-                  //             if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 E0.1F%i"),movespeed);enquecommand(value);}
-                  //             else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 E-0.1F%i"),movespeed);enquecommand(value);}
-                  //             else {sprintf_P(value,PSTR("G1 E%iF500"),int(coorvalue)); enquecommand(value); }
-                  //           //  else {sprintf_P(value,PSTR("G1 E%iF%i"),int(coorvalue),movespeed); enquecommand(value); }
-                  //          }
-                  //            enquecommand_P(PSTR("G90"));
-                  //         }
-                  //         TFT_SERIAL_ENTER();
+        			             if((!planner.movesplanned()))//&&(!TFTresumingflag))
+                                  {
+                                    float coorvalue;
+                                    unsigned int movespeed=0;
+                                    char value[30];
+                                    if(TFTcode_seen('F')) movespeed =TFTcode_value();//movespeed=constrain(TFTcode_value(), 1,5000);
+                                    enqueue_and_echo_commands_P(PSTR("G91"));
+                                    if(TFTcode_seen('X'))
+                                    {
+                                       coorvalue=TFTcode_value();
+                                      if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 X0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 X-0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else {sprintf_P(value,PSTR("G1 X%iF%i"),int(coorvalue),movespeed); _enqueuecommand(value); }
+                                    }
+                                    else if(TFTcode_seen('Y'))
+                                    {
+                                      coorvalue=TFTcode_value();
+                                      if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 Y0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 Y-0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else {sprintf_P(value,PSTR("G1 Y%iF%i"),int(coorvalue),movespeed); _enqueuecommand(value); }
+                                    }
+                                   else if(TFTcode_seen('Z'))
+                                   {
+                                      coorvalue=TFTcode_value();
+                                      if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 Z0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 Z-0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else {sprintf_P(value,PSTR("G1 Z%iF%i"),int(coorvalue),movespeed); _enqueuecommand(value); }
+                                   }
+                                  else if(TFTcode_seen('E'))
+                                   {
+                                      coorvalue=TFTcode_value();
+                                      if((coorvalue<=0.2)&&coorvalue>0){sprintf_P(value,PSTR("G1 E0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else if((coorvalue<=-0.1)&&coorvalue>-1){sprintf_P(value,PSTR("G1 E-0.1F%i"),movespeed);_enqueuecommand(value);}
+                                      else {sprintf_P(value,PSTR("G1 E%iF500"),int(coorvalue)); _enqueuecommand(value); }
+                                    //  else {sprintf_P(value,PSTR("G1 E%iF%i"),int(coorvalue),movespeed); _enqueuecommand(value); }
+                                   }
+                                     enqueue_and_echo_commands_P(PSTR("G90"));
+                                  }
+                                  TFT_SERIAL_ENTER();
                           break;
                           case 23: //a23 prheat pla
 			  // if((!movesplanned())&&(!TFTresumingflag))
         //                   {
-        //                     if((READ(Z_TEST)==0)) enquecommand_P(PSTR("G1 Z10")); //RASE Z AXIS
+        //                     if((READ(Z_TEST)==0)) enqueue_and_echo_commands_P(PSTR("G1 Z10")); //RASE Z AXIS
         //                     setTargetBed(50);
         //                     setTargetHotend(190, 0);
         //                     NEW_SERIAL_SUCC_START;
@@ -13821,7 +13820,7 @@ void get_command_from_TFT()
                           case 24://a24 prheat abs
 			  // if((!movesplanned())&&(!TFTresumingflag))
         //                   {
-        //                     if((READ(Z_TEST)==0)) enquecommand_P(PSTR("G1 Z10")); //RASE Z AXIS
+        //                     if((READ(Z_TEST)==0)) enqueue_and_echo_commands_P(PSTR("G1 Z10")); //RASE Z AXIS
         //                     setTargetBed(80);
         //                      setTargetHotend(240, 0);
         //
@@ -13946,8 +13945,8 @@ static char temp=0;
  //if(buflen < BUFSIZE)
  {
    //temp++;
-   //if(temp==1)enquecommand_P(PSTR("G91"));
-   //if(temp==2){enquecommand_P(PSTR("G1 Z+20")); pauseCMDsendflag=false;temp=0;}
+   //if(temp==1)enqueue_and_echo_commands_P(PSTR("G91"));
+   //if(temp==2){enqueue_and_echo_commands_P(PSTR("G1 Z+20")); pauseCMDsendflag=false;temp=0;}
  }
 }
 
@@ -14233,7 +14232,7 @@ void setup() {
  */
 void loop() {
   // *AnyCubic Mods
-  //if(pauseCMDsendflag)pauseCMDsend();//when pause,i need rase z axis,but if i use enquecommand_P,it maybe lose cmd,very dangerous,so i need sent cmd one by one
+  //if(pauseCMDsendflag)pauseCMDsend();//when pause,i need rase z axis,but if i use enqueue_and_echo_commands_P,it maybe lose cmd,very dangerous,so i need sent cmd one by one
   // *AnyCubic
 
   if (commands_in_queue < BUFSIZE) get_available_commands();
